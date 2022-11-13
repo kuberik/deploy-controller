@@ -1,0 +1,23 @@
+hiddenMemberFields:
+  - "TypeMeta"
+
+externalPackages:
+  - match: ^k8s\.io/(api|apimachinery/pkg/apis)/
+    target: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#{{- lower .TypeIdentifier -}}-{{- arrIndex .PackageSegments -1 -}}-{{- arrIndex .PackageSegments -2 -}}
+
+hideTypePatterns:
+  - "List$"
+  - "Phase"
+
+markdownDisabled: true
+
+stripPrefix:
+  - meta/v1.
+  - k8s.io/api/core/v1.
+  - k8s.io/apimachinery/pkg/apis/meta/v1.
+
+apis:
+  - name: kuberik-core
+    title: Kuberik Core
+    package: github.com/kuberik/kuberik
+    path: api/v1alpha1

@@ -1,0 +1,10 @@
+apiVersion: kuberik.io/v1alpha1
+kind: Live
+metadata:
+  name: live-y78ba8a
+  annotations:
+    config.kubernetes.io/local-config: "true"
+spec:
+  repository:
+    url: https://github.com/kuberik/kuberik.git
+  commit: 1f15571a3ae294d1901050d4f835f3c7ff907355

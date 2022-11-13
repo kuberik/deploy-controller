@@ -1,0 +1,35 @@
+domain: kuberik.io
+layout:
+- go.kubebuilder.io/v3
+projectName: kuberik
+repo: github.com/kuberik/kuberik
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kuberik.io
+  kind: Live
+  path: github.com/kuberik/kuberik/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kuberik.io
+  kind: LiveDeployment
+  path: github.com/kuberik/kuberik/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kuberik.io
+  kind: LiveDeploymentGroup
+  path: github.com/kuberik/kuberik/api/v1alpha1
+  version: v1alpha1
+version: "3"

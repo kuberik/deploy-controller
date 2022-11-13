@@ -1,0 +1,7 @@
+node_modules
+
+# api-reference is auto-generated and does not need to be commited
+site/api-reference/*
+
+# docs build
+site/.vitepress/dist

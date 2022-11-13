@@ -1,0 +1,6 @@
+apiVersion: kuberik.io/v1alpha1
+kind: Live
+metadata:
+  name: live-sample
+spec:
+  # TODO(user): Add fields here

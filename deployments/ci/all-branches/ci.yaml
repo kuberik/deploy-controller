@@ -1,0 +1,42 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ci
+rules:
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ci
+subjects:
+- kind: ServiceAccount
+  name: ci
+roleRef:
+  kind: Role
+  name: ci
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: kuberik.io/v1alpha1
+kind: LiveDeploymentGroup
+metadata:
+  name: ci
+spec:
+  template:
+    spec:
+      serviceAccountName: ci
+      path: deployments/ci/build
+      transformers: deployments/ci/build/transform
+      repository:
+        url: https://github.com/kuberik/kuberik.git
+        auth:
+          secretRef:
+            name: github-token

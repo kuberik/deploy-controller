@@ -1,0 +1,145 @@
+.aside-curtain {
+    display: none;
+}
+
+@font-face {
+    font-family: "Montserrat";
+    src: url("./Montserrat-VariableFont_wght.ttf");
+}
+
+.logo-cutout {
+    fill: var(--vp-c-bg);
+}
+
+
+:root {
+    /* turquoise */
+    --vp-c-turquoise-darker: #00a393;
+    --vp-c-turquoise-dark: #00b8a5;
+    --vp-c-turquoise: #00c9b5;
+    --vp-c-turquoise-light: #00e0ca;
+    --vp-c-turquoise-lighter: #00f5dc;
+
+    /* Pacific blue */
+    --vp-c-pacific-blue-darker: #00b2c2;
+    --vp-c-pacific-blue-dark: #00b2c2;
+    --vp-c-pacific-blue: #00b2c2;
+    --vp-c-pacific-blue-light: #00b2c2;
+    --vp-c-pacific-blue-lighter: #00b2c2;
+
+    --brand-gradient-darker: linear-gradient(42deg, var(--vp-c-turquoise-darker), var(--vp-c-pacific-blue-darker));
+    --brand-gradient-dark: linear-gradient(42deg, var(--vp-c-turquoise-dark), var(--vp-c-pacific-blue-dark));
+    --brand-gradient: linear-gradient(42deg, var(--vp-c-turquoise), var(--vp-c-pacific-blue));
+    --brand-gradient-light: linear-gradient(42deg, var(--vp-c-turquoise-light), var(--vp-c-pacific-blue-light));
+    --brand-gradient-lighter: linear-gradient(42deg, var(--vp-c-turquoise-lighter), var(--vp-c-pacific-blue-lighter));
+
+    --vp-c-brand-darker: var(--vp-c-turquoise-darker);
+    --vp-c-brand-dark: var(--vp-c-turquoise-dark);
+    --vp-c-brand: var(--vp-c-turquoise);
+    --vp-c-brand-light: var(--vp-c-turquoise-light);
+    --vp-c-brand-lighter: var(--vp-c-turquoise-lighter);
+
+    --vp-c-brand-alt-darker: var(--vp-c-pacific-blue-darker);
+    --vp-c-brand-alt-dark: var(--vp-c-pacific-blue-dark);
+    --vp-c-brand-alt: var(--vp-c-pacific-blue);
+    --vp-c-brand-alt-light: var(--vp-c-pacific-blue-light);
+    --vp-c-brand-alt-lighter: var(--vp-c-pacific-blue-lighter);
+
+    --vp-c-black-soft: var(--vp-c-gray-dark-5);
+    --vp-c-black-mute: var(--vp-c-gray-dark-4);
+
+    --vp-c-gray-light-1: #949ab3;
+    --vp-c-gray-light-2: #abb0c4;
+    --vp-c-gray-light-3: #c3c7d5;
+    --vp-c-gray-light-4: #dbdde6;
+    --vp-c-gray-light-5: #f3f4f7;
+    --vp-c-gray-dark-1: #5d6583;
+    --vp-c-gray-dark-2: #4c526b;
+    --vp-c-gray-dark-3: #3b4054;
+    --vp-c-gray-dark-4: #222530;
+    --vp-c-gray-dark-5-soft: #1b1d26;
+    --vp-c-gray-dark-5: #181a22;
+    --vp-c-gray-dark-5-transparent: rgba(24, 26, 34, 0.90);
+}
+
+/* Button */
+:root {
+    --vp-button-brand-bg: none;
+    --vp-button-brand-hover-bg: none;
+    --vp-button-brand-text: var(--vp-c-gray-dark-5);
+    --vp-button-brand-hover-text: var(--vp-c-gray-dark-5);
+}
+
+.VPButton.brand {
+    background: var(--brand-gradient);
+}
+
+.VPButton.brand:hover {
+    background: var(--brand-gradient-light);
+}
+
+/* Sidebar */
+.dark {
+    --vp-c-bg-alt: var(--vp-c-gray-dark-5-soft);
+    --vp-c-bg-soft: var(--vp-c-gray-dark-4);
+    --vp-c-black: var(--vp-c-gray-dark-4);
+}
+
+/* Fixes a small discoloration in Safari by removing saturate(50%) */
+.VPNavBar.has-sidebar .content {
+    -webkit-backdrop-filter: blur(8px) !important;
+    backdrop-filter: blur(8px) !important;
+}
+
+/* Code snippets */
+:root {
+    --vp-code-block-bg: var(--vp-c-gray-dark-3);
+}
+
+.dark {
+    --vp-code-block-bg: var(--vp-c-gray-dark-4);
+}
+
+/* Info block */
+:root {
+    --vp-custom-block-info-border: #bee5eb;
+    --vp-custom-block-info-text: #0c5460;
+    --vp-custom-block-info-bg: #d1ecf1;
+}
+
+.dark {
+    --vp-custom-block-info-border: rgb(30, 89, 97);
+    --vp-custom-block-info-text: rgb(142, 227, 241);
+    --vp-custom-block-info-bg: rgb(20, 59, 67);
+}
+
+@media (min-width: 960px) {
+
+    .dark .Layout .VPNav.no-sidebar,
+    .dark .Layout .VPNav.has-sidebar {
+        background: var(--vp-c-gray-dark-5);
+    }
+
+    .dark .Layout .VPNav .VPNavBar .content {
+        background: var(--vp-c-gray-dark-5-transparent);
+    }
+}
+
+@media (max-width: 960px) {
+    .VPHero .container .main {
+        margin-top: 16px;
+    }
+}
+
+.VPHero.VPHomeHero .name .clip {
+    background: var(--brand-gradient);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-family: "Montserrat";
+    font-weight: bold;
+}
+
+.VPNavBarTitle .title {
+    font-family: "Montserrat";
+}

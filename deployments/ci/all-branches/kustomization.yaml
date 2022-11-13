@@ -1,0 +1,5 @@
+resources:
+- namespace.yaml
+- ci.yaml
+
+namespace: kuberik-ci

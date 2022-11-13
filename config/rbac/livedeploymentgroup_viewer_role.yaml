@@ -1,0 +1,20 @@
+# permissions for end users to view livedeploymentgroups.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: livedeploymentgroup-viewer-role
+rules:
+- apiGroups:
+  - kuberik.io
+  resources:
+  - livedeploymentgroups
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kuberik.io
+  resources:
+  - livedeploymentgroups/status
+  verbs:
+  - get

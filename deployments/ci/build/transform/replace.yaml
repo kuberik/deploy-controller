@@ -1,0 +1,40 @@
+apiVersion: builtin
+kind: ReplacementTransformer
+metadata:
+  name: commit-sha
+replacements:
+- source:
+    kind: Live
+    fieldPath: spec.commit
+  targets:
+  - select:
+      kind: Job
+    fieldPaths:
+    - spec.template.spec.containers.[name=build].env.[name=CI_COMMIT_SHA].value
+    - spec.template.spec.containers.[name=build].env.[name=GITHUB_REF].value
+    options:
+      create: true
+  - select:
+      kind: Job
+    fieldPaths:
+    - metadata.name
+    options:
+      delimiter: "-"
+      index: 1
+---
+apiVersion: builtin
+kind: ReplacementTransformer
+metadata:
+  name: job-name-prefix
+replacements:
+- source:
+    kind: Live
+    fieldPath: metadata.name
+  targets:
+  - select:
+      kind: Job
+    fieldPaths:
+    - metadata.name
+    options:
+      delimiter: "-"
+      index: 0

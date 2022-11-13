@@ -1,0 +1,6 @@
+apiVersion: kuberik.io/v1alpha1
+kind: LiveDeployment
+metadata:
+  name: livedeployment-sample
+spec:
+  # TODO(user): Add fields here

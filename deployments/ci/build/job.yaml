@@ -1,0 +1,75 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prefix-suffix
+spec:
+  template:
+    spec:
+      containers:
+      - name: build
+        image: docker:dind
+        env:
+        - name: DOCKER_TLS_CERTDIR
+          value: ""
+        - name: DOCKER_HOST
+          value: tcp://localhost:2375
+        - name: CI_COMMIT_SHA
+        # Action to perform: 'update_state' or 'update_branch_protection'
+        - name: GITHUB_ACTION
+          value: update_state
+        # Github access token
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-token
+              key: token
+        # Github repository owner
+        - name: GITHUB_OWNER
+          value: kuberik
+        # Github repository name
+        - name: GITHUB_REPO
+          value: kuberik
+        # Commit SHA, branch name or tag
+        - name: GITHUB_REF
+        # Status label. Could be the name of a CI environment
+        - name: GITHUB_CONTEXT
+          value: "kuberik CI"
+        # Short high level summary of the status
+        - name: GITHUB_DESCRIPTION
+          value: "Kuberik CI"
+        # URL of the page representing the status
+        - name: GITHUB_TARGET_URL
+          value: "https://kuberik.io"
+        workingDir: /repo
+        securityContext:
+          privileged: true
+        command:
+        - "sh"
+        - "-c"
+        - |-
+          set -e
+          dockerd-entrypoint.sh &
+          apk add bash make go git jq
+          go install github.com/cloudposse/github-status-updater@latest
+
+          # Set pending status
+          GITHUB_STATE="pending" ~/go/bin/github-status-updater
+
+          docker login -u notImportant -p "$GITHUB_TOKEN" ghcr.io
+          echo "machine github.com login kuberik password $GITHUB_TOKEN" > ~/.netrc
+          git clone "https://github.com/$GITHUB_OWNER/$GITHUB_REPO" .
+          git checkout $GITHUB_REF
+
+          if IMG=ghcr.io/kuberik/kuberik/controller:$GITHUB_REF make build test docker-build docker-push; then
+            export GITHUB_STATE="success"
+          else
+            EXIT_CODE=$?
+            export GITHUB_STATE="failure"
+          fi
+
+          # Set result status
+          ~/go/bin/github-status-updater
+
+          exit ${EXIT_CODE:-0}
+      restartPolicy: Never
+  backoffLimit: 3

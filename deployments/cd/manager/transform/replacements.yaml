@@ -1,0 +1,17 @@
+apiVersion: builtin
+kind: ReplacementTransformer
+metadata:
+  name: image-tag
+replacements:
+- source:
+    kind: Live
+    fieldPath: spec.commit
+  targets:
+  - select:
+      kind: Deployment
+      name: kuberik-controller-manager
+    fieldPaths:
+    - spec.template.spec.containers.[name=manager].image
+    options:
+      delimiter: ":"
+      index: 1
