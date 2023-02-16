@@ -85,6 +85,9 @@ func (r *LiveReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	if !live.Reconciled() {
+		if backoff := live.BackoffRemaining(); backoff > 0 {
+			return ctrl.Result{RequeueAfter: backoff}, nil
+		}
 		return r.ReconcileApply(ctx, live)
 	}
 
@@ -136,8 +139,8 @@ func (r *LiveReconciler) ReconcileApply(ctx context.Context, live *kuberikiov1al
 		return ctrl.Result{}, r.ReconcileChanResult(ctx, live, r.ApplyResults, func(err error) error {
 			if err != nil {
 				live.SetPhase(kuberikiov1alpha1.LivePhase{
-					Name:         kuberikiov1alpha1.LivePhaseFailed,
-					ExtraMessage: err.Error(),
+					Name:               kuberikiov1alpha1.LivePhaseFailed,
+					ApplyResultMessage: err.Error(),
 				})
 			} else {
 				live.SetPhase(kuberikiov1alpha1.LivePhase{Name: kuberikiov1alpha1.LivePhaseSucceeded})

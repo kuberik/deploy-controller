@@ -18,10 +18,13 @@ package v1alpha1
 
 import (
 	"fmt"
+	"math"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -60,29 +63,28 @@ type LiveStatus struct {
 
 	// Conditions is a list of conditions on the Live resource
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// Number of consecutive apply attempts that resulted in a failure
+	Retries int `json:"retries,omitempty"`
 }
 
 type LivePhaseName string
 
 type LivePhase struct {
-	Name         LivePhaseName
-	ExtraMessage string
+	Name               LivePhaseName
+	ApplyResultMessage string
 }
 
-func (lp *LivePhase) formatMessage() string {
-	var messageBase string
+func (lp *LivePhase) applyReason() string {
 	switch lp.Name {
 	case LivePhaseApplying:
-		messageBase = "Applying the resources"
+		return ""
 	case LivePhaseSucceeded:
-		messageBase = "Apply complete"
+		return "ApplySucceeded"
 	case LivePhaseFailed:
-		messageBase = "Failed to apply the resources"
+		return "ApplyFailed"
 	}
-	if lp.ExtraMessage != "" {
-		return fmt.Sprintf("%s: %s", messageBase, lp.ExtraMessage)
-	}
-	return messageBase
+	panic(fmt.Sprintf("unsupported phase: %s", lp.Name))
 }
 
 const (
@@ -123,7 +125,8 @@ type LiveConditionType string
 
 const (
 	// LiveConditionReady is set when the Live is reconciled with the specified commit
-	LiveConditionReady LiveConditionType = "Ready"
+	LiveConditionReady       LiveConditionType = "Ready"
+	LiveConditionApplyResult LiveConditionType = "ApplyResult"
 )
 
 func (l *Live) GetReadyCondition() *metav1.Condition {
@@ -156,20 +159,46 @@ func (l *Live) SetPhase(phase LivePhase) {
 	var status metav1.ConditionStatus
 	switch phase.Name {
 	case LivePhaseApplying:
-		l.Status.Conditions = []metav1.Condition{}
+		if readyCondition := l.GetReadyCondition(); readyCondition != nil && readyCondition.ObservedGeneration != l.Generation {
+			l.Status.Conditions = []metav1.Condition{}
+			l.Status.Retries = 0
+		}
 		status = metav1.ConditionFalse
 	case LivePhaseSucceeded:
 		status = metav1.ConditionTrue
 	case LivePhaseFailed:
-		status = metav1.ConditionTrue
+		status = metav1.ConditionFalse
+		l.Status.Retries += 1
+	}
+
+	var readyMessage string
+	switch phase.Name {
+	case LivePhaseApplying:
+		readyMessage = "applying the resources"
+	case LivePhaseSucceeded:
+		readyMessage = "apply complete"
+	case LivePhaseFailed:
+		readyMessage = fmt.Sprintf("back-off %s failed to apply the resources", l.Backoff())
+	default:
+		panic("unknown phase")
 	}
 	meta.SetStatusCondition(&l.Status.Conditions, metav1.Condition{
 		Type:               string(LiveConditionReady),
 		Status:             status,
 		Reason:             string(phase.Name),
-		Message:            phase.formatMessage(),
+		Message:            readyMessage,
 		ObservedGeneration: l.Generation,
 	})
+
+	if applyReason := phase.applyReason(); applyReason != "" {
+		meta.SetStatusCondition(&l.Status.Conditions, metav1.Condition{
+			Type:               string(LiveConditionApplyResult),
+			Status:             status,
+			Reason:             applyReason,
+			Message:            phase.ApplyResultMessage,
+			ObservedGeneration: l.Generation,
+		})
+	}
 }
 
 func (l *Live) NamespacedName() types.NamespacedName {
@@ -181,6 +210,39 @@ func (l *Live) GetServiceAccountName() string {
 		return "default"
 	}
 	return l.Spec.ServiceAccountName
+}
+
+func (l *Live) Backoff() time.Duration {
+	backoff := wait.Backoff{
+		Duration: time.Second * 2,
+		Factor:   2,
+		// Max steps limited by cap
+		Steps: math.MaxInt,
+		Cap:   time.Minute * 5,
+	}
+
+	var backoffDuration time.Duration
+	for i := 0; i < l.Status.Retries; i++ {
+		backoffDuration = backoff.Step()
+	}
+	return backoffDuration
+}
+
+func (l *Live) BackoffRemaining() time.Duration {
+	return l.backoffRemainingAt(time.Now())
+}
+
+func (l *Live) backoffRemainingAt(t time.Time) time.Duration {
+	backoffDuration := l.Backoff()
+	if lastUpdate := l.GetReadyCondition(); lastUpdate != nil {
+		sinceLastUpdate := t.Sub(lastUpdate.LastTransitionTime.Time)
+		if remainingBackoffDuration := backoffDuration - sinceLastUpdate; remainingBackoffDuration > 0 {
+			return remainingBackoffDuration
+		} else {
+			return 0
+		}
+	}
+	return backoffDuration
 }
 
 //+kubebuilder:object:root=true
