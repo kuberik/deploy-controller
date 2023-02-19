@@ -231,7 +231,10 @@ func (c *KptClient) Apply(resMap resmap.ResMap, options ApplyOptions) error {
 	dryRunStrategy := common.DryRunNone
 	ch, err := applier.Run(c.ctx, invInfo, applyObjects.objects, apply.ApplierOptions{
 		// TODO: Use server-side
-		ServerSideOptions:      common.ServerSideOptions{},
+		ServerSideOptions: common.ServerSideOptions{
+			ServerSideApply: true,
+			FieldManager:    fmt.Sprintf("rg/%s/%s", applyObjects.resourceGroup.GetNamespace(), applyObjects.resourceGroup.GetName()),
+		},
 		ReconcileTimeout:       options.Timeout,
 		EmitStatusEvents:       true, // We are always waiting for reconcile.
 		DryRunStrategy:         dryRunStrategy,
