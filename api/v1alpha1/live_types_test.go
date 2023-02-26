@@ -35,4 +35,11 @@ func TestLiveBackoffRemaining(t *testing.T) {
 
 	currentTime = currentTime.Add(time.Millisecond * 500)
 	assert.Equal(t, live.backoffRemainingAt(currentTime), time.Millisecond*3500)
+
+	// Go past the backoff expiry time to make sure the remaining backoff time is at 0
+	currentTime = currentTime.Add(time.Millisecond * 10000)
+	assert.Equal(t, live.backoffRemainingAt(currentTime), time.Millisecond*0)
+	// Add some extra time to make sure we didn't hit the right spot with the previous test
+	currentTime = currentTime.Add(time.Millisecond * 10)
+	assert.Equal(t, live.backoffRemainingAt(currentTime), time.Millisecond*0)
 }
