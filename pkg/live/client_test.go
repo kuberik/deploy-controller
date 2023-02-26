@@ -146,6 +146,19 @@ func TestKptkptClientApplyWaitForReconcile(t *testing.T) {
 		t.Fatalf("apply failed: %v", err)
 	}
 
+	service, err := clientset.CoreV1().Services("default").Get(context.TODO(), "nginx", metav1.GetOptions{})
+	assert.NilError(t, err, "failed to get applied service")
+	service.ManagedFields[0].Time = nil
+	assert.DeepEqual(t, service.ManagedFields, []metav1.ManagedFieldsEntry{{
+		Manager:    "rg/default/reconcile",
+		Operation:  "Apply",
+		APIVersion: "v1",
+		FieldsType: "FieldsV1",
+		FieldsV1: &metav1.FieldsV1{
+			Raw: []byte(`{"f:metadata":{"f:annotations":{"f:config.k8s.io/owning-inventory":{}}},"f:spec":{"f:ports":{"k:{\"port\":8080,\"protocol\":\"TCP\"}":{".":{},"f:port":{},"f:targetPort":{}}}}}`),
+		},
+	}})
+
 	deletedResourcesBuild := resmap.New()
 	for _, r := range build.Resources()[:1] {
 		deletedResourcesBuild.Append(r)
