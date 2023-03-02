@@ -135,9 +135,12 @@ func (r *LiveReconciler) ReconcileApply(ctx context.Context, live *kuberikiov1al
 	if _, ok := r.ApplyResults[live.NamespacedName()]; ok {
 		return ctrl.Result{}, r.ReconcileChanResult(ctx, live, r.ApplyResults, func(err error) error {
 			if err != nil {
-				live.RegisterFailure(err)
+				live.SetPhase(kuberikiov1alpha1.LivePhase{
+					Name:         kuberikiov1alpha1.LivePhaseFailed,
+					ExtraMessage: err.Error(),
+				})
 			} else {
-				live.SetPhase(kuberikiov1alpha1.LivePhaseSucceeded)
+				live.SetPhase(kuberikiov1alpha1.LivePhase{Name: kuberikiov1alpha1.LivePhaseSucceeded})
 			}
 			return r.Client.Status().Update(ctx, live)
 		})
@@ -194,7 +197,7 @@ func (r *LiveReconciler) ReconcileApply(ctx context.Context, live *kuberikiov1al
 		return ctrl.Result{}, fmt.Errorf("failed to apply resources: %v", err)
 	}
 
-	live.SetPhase(kuberikiov1alpha1.LivePhaseApplying)
+	live.SetPhase(kuberikiov1alpha1.LivePhase{Name: kuberikiov1alpha1.LivePhaseApplying})
 	if err := r.Client.Status().Update(ctx, live); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to set state to applying: %v", err)
 	}

@@ -62,12 +62,33 @@ type LiveStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-type LivePhase string
+type LivePhaseName string
+
+type LivePhase struct {
+	Name         LivePhaseName
+	ExtraMessage string
+}
+
+func (lp *LivePhase) formatMessage() string {
+	var messageBase string
+	switch lp.Name {
+	case LivePhaseApplying:
+		messageBase = "Applying the resources"
+	case LivePhaseSucceeded:
+		messageBase = "Apply complete"
+	case LivePhaseFailed:
+		messageBase = "Failed to apply the resources"
+	}
+	if lp.ExtraMessage != "" {
+		return fmt.Sprintf("%s: %s", messageBase, lp.ExtraMessage)
+	}
+	return messageBase
+}
 
 const (
-	LivePhaseApplying  LivePhase = "Applying"
-	LivePhaseSucceeded LivePhase = "Succeeded"
-	LivePhaseFailed    LivePhase = "Failed"
+	LivePhaseApplying  LivePhaseName = "Applying"
+	LivePhaseSucceeded LivePhaseName = "Succeeded"
+	LivePhaseFailed    LivePhaseName = "Failed"
 )
 
 //+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -132,35 +153,21 @@ func (l *Live) InventoryID() string {
 }
 
 func (l *Live) SetPhase(phase LivePhase) {
-	switch phase {
+	var status metav1.ConditionStatus
+	switch phase.Name {
 	case LivePhaseApplying:
 		l.Status.Conditions = []metav1.Condition{}
-		meta.SetStatusCondition(&l.Status.Conditions, metav1.Condition{
-			Type:               string(LiveConditionReady),
-			Status:             metav1.ConditionFalse,
-			Reason:             string(phase),
-			Message:            "Applying the resources",
-			ObservedGeneration: l.Generation,
-		})
+		status = metav1.ConditionFalse
 	case LivePhaseSucceeded:
-		meta.SetStatusCondition(&l.Status.Conditions, metav1.Condition{
-			Type:               string(LiveConditionReady),
-			Status:             metav1.ConditionTrue,
-			Reason:             string(phase),
-			Message:            "Apply complete",
-			ObservedGeneration: l.Generation,
-		})
+		status = metav1.ConditionTrue
 	case LivePhaseFailed:
-		panic("call RegisterFailure() instead")
+		status = metav1.ConditionTrue
 	}
-}
-
-func (l *Live) RegisterFailure(err error) {
 	meta.SetStatusCondition(&l.Status.Conditions, metav1.Condition{
 		Type:               string(LiveConditionReady),
-		Status:             metav1.ConditionTrue,
-		Reason:             string(LivePhaseFailed),
-		Message:            fmt.Sprintf("Failed to apply the resources: %s", err),
+		Status:             status,
+		Reason:             string(phase.Name),
+		Message:            phase.formatMessage(),
 		ObservedGeneration: l.Generation,
 	})
 }

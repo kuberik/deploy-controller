@@ -93,7 +93,7 @@ var _ = Describe("Live webhook", func() {
 
 				By("By updating the Live status to applying")
 				Expect(k8sClient.Get(ctx, *liveLookupKey, live)).Should(Succeed())
-				live.SetPhase(LivePhaseApplying)
+				live.SetPhase(LivePhase{Name: LivePhaseApplying})
 				Expect(k8sClient.Status().Update(ctx, live)).Should(Succeed())
 
 				By("By updating the Live spec")
@@ -107,7 +107,7 @@ var _ = Describe("Live webhook", func() {
 
 				By("By updating the Live status to complete")
 				Expect(k8sClient.Get(ctx, *liveLookupKey, live)).Should(Succeed())
-				live.SetPhase(LivePhaseSucceeded)
+				live.SetPhase(LivePhase{Name: LivePhaseSucceeded})
 				Expect(k8sClient.Status().Update(ctx, live)).Should(Succeed())
 
 				By("By updating the Live spec")
@@ -136,7 +136,7 @@ var _ = Describe("Live webhook", func() {
 
 				By("By updating the Live status to applying")
 				Expect(k8sClient.Get(ctx, *liveLookupKey, live)).Should(Succeed())
-				live.SetPhase(LivePhaseApplying)
+				live.SetPhase(LivePhase{Name: LivePhaseApplying})
 				Expect(k8sClient.Status().Update(ctx, live)).Should(Succeed())
 
 				By("By updating the Live spec")
@@ -150,7 +150,7 @@ var _ = Describe("Live webhook", func() {
 
 				By("By updating the Live status to complete")
 				Expect(k8sClient.Get(ctx, *liveLookupKey, live)).Should(Succeed())
-				live.SetPhase(LivePhaseSucceeded)
+				live.SetPhase(LivePhase{Name: LivePhaseSucceeded})
 				Expect(k8sClient.Status().Update(ctx, live)).Should(Succeed())
 
 				By("By updating the Live spec")
