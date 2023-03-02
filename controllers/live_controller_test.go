@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -116,10 +117,10 @@ var _ = Describe("Live controller", func() {
 
 		timeout             = time.Second * 20
 		consistentlyTimeout = time.Second * 5
-		interval            = time.Millisecond * 250
+		interval            = time.Millisecond * 100
 	)
 
-	assertLiveReadyStatus := func(liveLookupKey types.NamespacedName, reason string, status metav1.ConditionStatus) {
+	assertLiveReadyStatus := func(liveLookupKey types.NamespacedName, reason string, status metav1.ConditionStatus, consistently bool) {
 		check := func(check func(actual interface{}, intervals ...interface{}) AsyncAssertion, intervals ...interface{}) {
 			check(func() (*kuberikiov1alpha1.Live, error) {
 				live := &kuberikiov1alpha1.Live{}
@@ -145,7 +146,9 @@ var _ = Describe("Live controller", func() {
 			))
 		}
 		check(Eventually, timeout, interval)
-		check(Consistently, consistentlyTimeout, interval)
+		if consistently {
+			check(Consistently, consistentlyTimeout, interval)
+		}
 
 		Eventually(func() error {
 			_, err := dynClient.Resource(schema.GroupVersionResource{
@@ -164,6 +167,51 @@ var _ = Describe("Live controller", func() {
 		var commit plumbing.Hash
 		var repo *git.Repository
 		testCaseCounter := 0
+
+		setPodPhasePending := func(podLookupKey types.NamespacedName) {
+			pod := &corev1.Pod{}
+			Eventually(func() error {
+				return k8sClient.Get(ctx, podLookupKey, pod)
+			}, timeout, interval).Should(Succeed())
+
+			pod.Status.Phase = corev1.PodPending
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{}
+			Eventually(func() error {
+				return k8sClient.Status().Update(ctx, pod)
+			}, timeout, interval).Should(Succeed())
+		}
+
+		setPodPhaseCrashed := func(podLookupKey types.NamespacedName, containerName string) {
+			pod := &corev1.Pod{}
+			Eventually(func() error {
+				return k8sClient.Get(ctx, podLookupKey, pod)
+			}, timeout, interval).Should(Succeed())
+
+			pod.Status.Phase = corev1.PodRunning
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+				Name: containerName,
+				State: corev1.ContainerState{
+					Waiting: &corev1.ContainerStateWaiting{
+						Reason:  "CrashLoopBackOff",
+						Message: rand.String(10),
+					},
+				},
+			}}
+			Eventually(func() error {
+				return k8sClient.Status().Update(ctx, pod)
+			}, timeout, interval).Should(Succeed())
+		}
+
+		setPodPhaseComplete := func(podLookupKey types.NamespacedName) {
+			pod := &corev1.Pod{}
+
+			Eventually(func() error {
+				return k8sClient.Get(ctx, podLookupKey, pod)
+			}, timeout, interval).Should(Succeed())
+
+			pod.Status.Phase = corev1.PodSucceeded
+			Expect(k8sClient.Status().Update(ctx, pod)).Should(Succeed())
+		}
 
 		JustBeforeEach(func() {
 			testCaseCounter++
@@ -246,16 +294,10 @@ resources: [pod.yaml]
 			})
 			It("Should reconcile Live successfully", func() {
 				podLookupKey := types.NamespacedName{Name: "live-pod-success", Namespace: liveLookupKey.Namespace}
-				createdPod := &corev1.Pod{}
 
 				By("By waiting for Pod to reconcile")
-				Eventually(func() error {
-					return k8sClient.Get(ctx, podLookupKey, createdPod)
-				}, timeout, interval).Should(Succeed())
-
-				createdPod.Status.Phase = corev1.PodSucceeded
-				Expect(k8sClient.Status().Update(ctx, createdPod)).Should(Succeed())
-				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseSucceeded), metav1.ConditionTrue)
+				setPodPhaseComplete(podLookupKey)
+				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseSucceeded), metav1.ConditionTrue, true)
 			})
 		})
 		When("Deployed resources reconcile fails", func() {
@@ -281,24 +323,76 @@ resources: [pod.yaml]
 			})
 			It("Should reconcile Live with a failure", func() {
 				podLookupKey := types.NamespacedName{Name: "live-pod-failure", Namespace: liveLookupKey.Namespace}
-				createdPod := &corev1.Pod{}
+				containerName := "nginx"
 
-				By("By waiting for Pod to reconcile")
-				Eventually(func() error {
-					return k8sClient.Get(ctx, podLookupKey, createdPod)
-				}, timeout, interval).Should(Succeed())
+				stop := make(chan interface{})
+				// simulate repeatedly crashing pod
+				go func() {
+					for {
+						select {
+						case <-time.After(time.Second):
+							setPodPhasePending(podLookupKey)
+							setPodPhaseCrashed(podLookupKey, containerName)
+						case <-stop:
+							return
+						}
+					}
+				}()
 
-				createdPod.Status.Phase = corev1.PodRunning
-				createdPod.Status.ContainerStatuses = []corev1.ContainerStatus{{
-					Name: "nginx",
-					State: corev1.ContainerState{
-						Waiting: &corev1.ContainerStateWaiting{
-							Reason: "CrashLoopBackOff",
-						},
-					},
-				}}
-				Expect(k8sClient.Status().Update(ctx, createdPod)).Should(Succeed())
-				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseFailed), metav1.ConditionFalse)
+				By("By waiting for Pod to try to reconcile")
+				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseApplying), metav1.ConditionFalse, false)
+
+				By("By waiting for Pod to crash")
+				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseFailed), metav1.ConditionFalse, false)
+
+				By("By waiting for Pod to try to reconcile again")
+				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseApplying), metav1.ConditionFalse, false)
+
+				By("By waiting for Pod to crash again")
+				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseFailed), metav1.ConditionFalse, false)
+
+				stop <- nil
+				close(stop)
+			})
+		})
+		When("Deployed resources reconcile fails on first try", func() {
+			BeforeEach(func() {
+				gitFiles = fstest.MapFS{
+					"resources.yaml": {
+						Data: []byte(`
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: live-pod-recover
+          namespace: default
+        spec:
+          containers:
+          - name: nginx
+            image: nginx
+        `)},
+					"kustomization.yaml": {
+						Data: []byte(`
+        resources: [resources.yaml]
+        `)},
+				}
+			})
+			It("Should reconcile Live with a failure and then success", func() {
+				podLookupKey := types.NamespacedName{Name: "live-pod-recover", Namespace: liveLookupKey.Namespace}
+				containerName := "nginx"
+
+				By("By waiting for Pod to try to reconcile")
+				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseApplying), metav1.ConditionFalse, false)
+
+				By("By waiting for Pod to crash")
+				setPodPhaseCrashed(podLookupKey, containerName)
+				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseFailed), metav1.ConditionFalse, false)
+
+				By("By waiting for Pod to try to reconcile again")
+				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseApplying), metav1.ConditionFalse, false)
+
+				By("By waiting for Pod to finish with success")
+				setPodPhaseComplete(podLookupKey)
+				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseSucceeded), metav1.ConditionTrue, true)
 			})
 		})
 		When("Live transformers are set", func() {
@@ -358,7 +452,7 @@ replacements:
 
 				createdPod.Status.Phase = corev1.PodSucceeded
 				Expect(k8sClient.Status().Update(ctx, createdPod)).Should(Succeed())
-				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseSucceeded), metav1.ConditionTrue)
+				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseSucceeded), metav1.ConditionTrue, true)
 			})
 		})
 		When("Live commit is updated", func() {
@@ -381,7 +475,7 @@ configMapGenerator:
 				createdConfigMap := &corev1.ConfigMap{}
 
 				By("By waiting for Live to reconcile first commit")
-				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseSucceeded), metav1.ConditionTrue)
+				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseSucceeded), metav1.ConditionTrue, true)
 
 				Eventually(func() error {
 					return k8sClient.Get(ctx, configMapLookupKey, createdConfigMap)
@@ -424,7 +518,7 @@ configMapGenerator:
 					}
 					return createdConfigMap.Data["foo"], nil
 				}, timeout, interval).Should(Equal("bar2"))
-				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseSucceeded), metav1.ConditionTrue)
+				assertLiveReadyStatus(*liveLookupKey, string(kuberikiov1alpha1.LivePhaseSucceeded), metav1.ConditionTrue, true)
 			})
 		})
 		AfterEach(func() {
@@ -466,7 +560,7 @@ configMapGenerator:
 			Expect(k8sClient.Create(ctx, live)).Should(Succeed())
 
 			liveLookupKey := types.NamespacedName{Name: live.Name, Namespace: live.Namespace}
-			assertLiveReadyStatus(liveLookupKey, string(kuberikiov1alpha1.LivePhaseSucceeded), metav1.ConditionTrue)
+			assertLiveReadyStatus(liveLookupKey, string(kuberikiov1alpha1.LivePhaseSucceeded), metav1.ConditionTrue, true)
 		})
 	})
 
@@ -508,7 +602,7 @@ configMapGenerator:
 			Expect(k8sClient.Create(ctx, live)).Should(Succeed())
 
 			liveLookupKey := types.NamespacedName{Name: live.Name, Namespace: live.Namespace}
-			assertLiveReadyStatus(liveLookupKey, string(kuberikiov1alpha1.LivePhaseSucceeded), metav1.ConditionTrue)
+			assertLiveReadyStatus(liveLookupKey, string(kuberikiov1alpha1.LivePhaseSucceeded), metav1.ConditionTrue, true)
 
 			getConfigMap := func() error {
 				return k8sClient.Get(ctx, configMapLookupKey, &corev1.ConfigMap{})
