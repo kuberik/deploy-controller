@@ -1,4 +1,4 @@
-# Kuberik
+# kuberik
 
 <img src="./docs/site/public/logo.svg" height=100 />
 
